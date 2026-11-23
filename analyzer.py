@@ -147,23 +147,36 @@ def analyze_response(marker, test_input, response_text):
     Perform complete XSS reflection and response analysis.
     """
 
-    # Step 1: Check whether the marker is reflected
+    # Validate input types
+    if not all(isinstance(value, str) for value in
+               [marker, test_input, response_text]):
+        raise TypeError(
+            "Marker, test input, and response must be strings."
+        )
+
+    # Validate empty marker and test input
+    if not marker.strip() or not test_input.strip():
+        raise ValueError(
+            "Marker and test input cannot be empty."
+        )
+
+    # Step 1: Check reflection
     reflected = detect_reflection(marker, response_text)
 
-    # Step 2: Identify the reflection context
+    # Step 2: Identify context
     contexts = identify_context(marker, response_text)
 
-    # Step 3: Check whether the input is encoded
+    # Step 3: Check encoding
     encoding_result = check_encoding(test_input, response_text)
 
-    # Step 4: Classify the potential finding
+    # Step 4: Classify finding
     classification = classify_finding(
         reflected,
         contexts,
         encoding_result
     )
 
-    # Step 5: Return all analysis results
+    # Step 5: Return analysis
     return {
         "reflected": reflected,
         "contexts": contexts,
@@ -172,8 +185,6 @@ def analyze_response(marker, test_input, response_text):
         "confidence": classification["confidence"],
         "explanation": classification["explanation"]
     }
-
-
 
 def display_result(result):
     """
