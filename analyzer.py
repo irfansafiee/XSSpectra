@@ -1,7 +1,9 @@
 
 import html
 from html.parser import HTMLParser
+from colorama import Fore, Style, init
 
+init(autoreset=True)
 
 def detect_reflection(marker, response_text):
     """
@@ -172,102 +174,54 @@ def analyze_response(marker, test_input, response_text):
     }
 
 
-if __name__ == "__main__":
 
-    marker = "XSS_TEST_123"
-
-    response = """
-    <html>
-        <body>
-            <p>Search result: XSS_TEST_123</p>
-        </body>
-    </html>
+def display_result(result):
+    """
+    Display XSS analysis results with terminal colours.
     """
 
-    result = detect_reflection(marker, response)
+    risk = result["risk"]
 
-    print("Reflection detected:", result)
+    if risk == "High":
+        risk_color = Fore.RED
+    elif risk == "Medium":
+        risk_color = Fore.YELLOW
+    elif risk == "Low":
+        risk_color = Fore.GREEN
+    else:
+        risk_color = Fore.CYAN
 
-    print("\n--- Context Detection Tests ---")
+    print("\n" + "=" * 45)
+    print(Fore.CYAN + Style.BRIGHT + "          XSSpectra - ANALYSIS REPORT")
+    print("=" * 45)
 
-    html_response = "<p>TEST123</p>"
-    attribute_response = '<input value="TEST123">'
-    script_response = '<script>var x = "TEST123";</script>'
+    print(f"Reflection       : {'Detected' if result['reflected'] else 'Not Detected'}")
+    print(f"Context          : {', '.join(result['contexts']) if result['contexts'] else 'Unknown'}")
+    print(f"Encoding         : {'Detected' if result['encoding']['encoded'] else 'Not Detected'}")
 
-    print("HTML text:", identify_context("TEST123", html_response))
-    print("HTML attribute:", identify_context("TEST123", attribute_response))
-    print("JavaScript:", identify_context("TEST123", script_response))
+    print("-" * 45)
+    print(f"Risk Level       : {risk_color}{Style.BRIGHT}{risk}")
+    print(f"Confidence       : {result['confidence']}")
+    print("-" * 45)
 
+    print("Explanation:")
+    print(result["explanation"])
 
-    print("\n--- Encoding Detection Tests ---")
-
-    original_input = "<XSS_TEST>"
-
-    safe_response = "<p>&lt;XSS_TEST&gt;</p>"
-
-    unsafe_response = "<p><XSS_TEST></p>"
-
-    print("Safe response:",
-          check_encoding(original_input, safe_response))
-
-    print("Raw response:",
-          check_encoding(original_input, unsafe_response))
+    print("=" * 45)
 
 
-    print("\n--- Risk Classification Tests ---")
 
-    test_result = classify_finding(
-        True,
-        ["html_attribute"],
-        {
-            "encoded": False,
-            "raw_reflected": True,
-            "encoded_reflected": False
-        }
+if __name__ == "__main__":
+
+    marker = "TEST123"
+    test_input = "<TEST123>"
+
+    response = '<input value="<TEST123>">'
+
+    result = analyze_response(
+        marker,
+        test_input,
+        response
     )
 
-    print("Classification:", test_result)
-
-
-    print("\n--- Complete Analysis Test ---")
-
-    final_result = analyze_response(
-        "TEST123",
-        "<TEST123>",
-        '<input value="<TEST123>">'
-    )
-
-    print("Final Analysis:", final_result)
-
-
-    print("\n--- No Reflection Test ---")
-
-    no_reflection_result = analyze_response(
-        "TEST123",
-        "<TEST123>",
-        "<html><body>Welcome to the website!</body></html>"
-    )
-
-    print("No Reflection Analysis:", no_reflection_result)
-
-
-    print("\n--- Encoded Reflection Analysis Test ---")
-
-    encoded_result = analyze_response(
-        "TEST123",
-        "<TEST123>",
-        "<html><body>&lt;TEST123&gt;</body></html>"
-    )
-
-    print("Encoded Analysis:", encoded_result)
-
-
-    print("\n--- JavaScript Context Analysis Test ---")
-
-    javascript_result = analyze_response(
-        "TEST123",
-        "<TEST123>",
-        '<html><script>var message = "TEST123";</script></html>'
-    )
-
-    print("JavaScript Analysis:", javascript_result)
+    display_result(result)
