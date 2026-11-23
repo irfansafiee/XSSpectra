@@ -91,9 +91,11 @@ def check_encoding(test_input, response_text):
     }
 
 
+
 def classify_finding(reflected, contexts, encoding_result):
     """
-    Classify potential XSS findings based on reflection and context.
+    Classify potential XSS findings based on reflection,
+    context, and encoding.
     """
 
     if not reflected:
@@ -101,13 +103,6 @@ def classify_finding(reflected, contexts, encoding_result):
             "risk": "Informational",
             "confidence": "High",
             "explanation": "No test marker was reflected in the response."
-        }
-
-    if encoding_result["encoded"]:
-        return {
-            "risk": "Low",
-            "confidence": "Medium",
-            "explanation": "The test input appears to be HTML-encoded."
         }
 
     if "javascript" in contexts:
@@ -125,10 +120,17 @@ def classify_finding(reflected, contexts, encoding_result):
         }
 
     if "html_text" in contexts:
+        if encoding_result["encoded"]:
+            return {
+                "risk": "Low",
+                "confidence": "Medium",
+                "explanation": "The test input appears to be HTML-encoded in an HTML text context."
+            }
+
         return {
             "risk": "Medium",
             "confidence": "Medium",
-            "explanation": "The test marker was reflected inside HTML text."
+            "explanation": "The test marker was reflected inside HTML text without detected encoding."
         }
 
     return {
@@ -236,3 +238,36 @@ if __name__ == "__main__":
     )
 
     print("Final Analysis:", final_result)
+
+
+    print("\n--- No Reflection Test ---")
+
+    no_reflection_result = analyze_response(
+        "TEST123",
+        "<TEST123>",
+        "<html><body>Welcome to the website!</body></html>"
+    )
+
+    print("No Reflection Analysis:", no_reflection_result)
+
+
+    print("\n--- Encoded Reflection Analysis Test ---")
+
+    encoded_result = analyze_response(
+        "TEST123",
+        "<TEST123>",
+        "<html><body>&lt;TEST123&gt;</body></html>"
+    )
+
+    print("Encoded Analysis:", encoded_result)
+
+
+    print("\n--- JavaScript Context Analysis Test ---")
+
+    javascript_result = analyze_response(
+        "TEST123",
+        "<TEST123>",
+        '<html><script>var message = "TEST123";</script></html>'
+    )
+
+    print("JavaScript Analysis:", javascript_result)
