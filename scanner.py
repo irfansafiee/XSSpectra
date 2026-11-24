@@ -13,6 +13,7 @@ import requests
 import time
 from bs4 import BeautifulSoup
 import json
+from analyzer import analyze_response, display_result
 
 # --------------------------------------------------
 # 1. SAFETY CONFIGURATION
@@ -274,7 +275,9 @@ def send_test_request(
                 "elapsed_seconds": round(elapsed, 4),
                 "marker_reflected": marker in response_text,
                 "response_truncated": len(response_body) >= max_response_size,
+                "original_value": test_case["original_value"],
                 "error": None
+                
             }
 
     except requests.Timeout:
@@ -608,6 +611,20 @@ def main():
             if result["error"]:
                 print("    [-] Request failed:", result["error"])
                 continue
+
+            # Perform XSS response analysis
+            print("\n    [+] Starting XSS analysis...")
+
+            analysis = analyze_response(
+                result["marker"],
+                result["original_value"],
+                result["response_text"]
+            )
+
+            display_result(analysis)
+
+            # Store analysis results
+            result["analysis"] = analysis
 
             print("    [+] HTTP Status:", result["status_code"])
             print("    [+] Response Time:",

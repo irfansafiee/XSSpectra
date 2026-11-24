@@ -102,6 +102,16 @@ class TestXSSAnalyzer(unittest.TestCase):
                 "<p>TEST123</p>"
             )
 
+    def test_encoding_not_applicable_without_special_characters(self):
+        result = check_encoding(
+            "hello",
+            "<p>hello</p>"
+        )
+
+        self.assertFalse(result["encoded"])
+        self.assertFalse(result["raw_reflected"])
+        self.assertFalse(result["encoded_reflected"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

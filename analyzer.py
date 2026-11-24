@@ -5,6 +5,11 @@ from colorama import Fore, Style, init
 
 init(autoreset=True)
 
+
+# --------------------------------------------------
+# 1. REFLECTION DETECTION
+# --------------------------------------------------
+
 def detect_reflection(marker, response_text):
     """
     Check whether the test marker appears in the HTTP response.
@@ -15,6 +20,10 @@ def detect_reflection(marker, response_text):
 
     return marker in response_text
 
+
+# --------------------------------------------------
+# 2. CONTEXT IDENTIFICATION
+# --------------------------------------------------
 
 def identify_context(marker, response_text):
     """
@@ -39,6 +48,7 @@ def identify_context(marker, response_text):
                     contexts.append("html_attribute")
 
         def handle_startendtag(self, tag, attrs):
+
             for name, value in attrs:
                 if value and marker in value:
                     contexts.append("html_attribute")
@@ -63,18 +73,36 @@ def identify_context(marker, response_text):
     try:
         parser.feed(response_text)
         parser.close()
+
     except Exception:
         pass
 
     return list(dict.fromkeys(contexts))
 
 
+# --------------------------------------------------
+# 3. ENCODING DETECTION
+# --------------------------------------------------
+
 def check_encoding(test_input, response_text):
     """
-    Check whether special characters are HTML-encoded.
+    Check whether special characters in the test input
+    are reflected raw or HTML-encoded.
     """
 
     if not test_input or not response_text:
+        return {
+            "encoded": False,
+            "raw_reflected": False,
+            "encoded_reflected": False
+        }
+
+    # Characters that HTML escaping changes.
+    special_characters = '<>"&'
+
+    # Encoding assessment is not applicable
+    # when the input contains no special characters.
+    if not any(char in test_input for char in special_characters):
         return {
             "encoded": False,
             "raw_reflected": False,
@@ -93,11 +121,14 @@ def check_encoding(test_input, response_text):
     }
 
 
+# --------------------------------------------------
+# 4. RISK CLASSIFICATION
+# --------------------------------------------------
 
-def classify_finding(reflected, contexts, encoding_result):
+def classify_finding(reflected, contexts, encoding_result, test_input=""):
     """
     Classify potential XSS findings based on reflection,
-    context, and encoding.
+    context, and encoding assessment.
     """
 
     if not reflected:
@@ -122,61 +153,92 @@ def classify_finding(reflected, contexts, encoding_result):
         }
 
     if "html_text" in contexts:
+
+        special_characters = '<>"&'
+
+        # Check whether encoding assessment applies.
+        if not any(char in test_input for char in special_characters):
+            return {
+                "risk": "Medium",
+                "confidence": "Low",
+                "explanation": (
+                    "The test marker was reflected inside HTML text, "
+                    "but encoding was not assessed because the input "
+                    "contained no special characters."
+                )
+            }
+
         if encoding_result["encoded"]:
             return {
                 "risk": "Low",
                 "confidence": "Medium",
-                "explanation": "The test input appears to be HTML-encoded in an HTML text context."
+                "explanation": (
+                    "The test input appears to be HTML-encoded "
+                    "in an HTML text context."
+                )
             }
 
         return {
             "risk": "Medium",
             "confidence": "Medium",
-            "explanation": "The test marker was reflected inside HTML text without detected encoding."
+            "explanation": (
+                "The test input was reflected inside HTML text "
+                "without detected encoding."
+            )
         }
 
     return {
         "risk": "Informational",
         "confidence": "Low",
-        "explanation": "Reflection was detected, but its context could not be identified."
+        "explanation": (
+            "Reflection was detected, but its context "
+            "could not be identified."
+        )
     }
 
+
+# --------------------------------------------------
+# 5. COMPLETE RESPONSE ANALYSIS
+# --------------------------------------------------
 
 def analyze_response(marker, test_input, response_text):
     """
     Perform complete XSS reflection and response analysis.
     """
 
-    # Validate input types
-    if not all(isinstance(value, str) for value in
-               [marker, test_input, response_text]):
+    # Validate input types.
+    if not all(
+        isinstance(value, str)
+        for value in [marker, test_input, response_text]
+    ):
         raise TypeError(
             "Marker, test input, and response must be strings."
         )
 
-    # Validate empty marker and test input
+    # Validate empty marker and test input.
     if not marker.strip() or not test_input.strip():
         raise ValueError(
             "Marker and test input cannot be empty."
         )
 
-    # Step 1: Check reflection
+    # Step 1: Check reflection.
     reflected = detect_reflection(marker, response_text)
 
-    # Step 2: Identify context
+    # Step 2: Identify HTML context.
     contexts = identify_context(marker, response_text)
 
-    # Step 3: Check encoding
+    # Step 3: Check encoding.
     encoding_result = check_encoding(test_input, response_text)
 
-    # Step 4: Classify finding
+    # Step 4: Classify finding.
     classification = classify_finding(
         reflected,
         contexts,
-        encoding_result
+        encoding_result,
+        test_input
     )
 
-    # Step 5: Return analysis
+    # Step 5: Return analysis results.
     return {
         "reflected": reflected,
         "contexts": contexts,
@@ -185,6 +247,11 @@ def analyze_response(marker, test_input, response_text):
         "confidence": classification["confidence"],
         "explanation": classification["explanation"]
     }
+
+
+# --------------------------------------------------
+# 6. DISPLAY ANALYSIS REPORT
+# --------------------------------------------------
 
 def display_result(result):
     """
@@ -195,24 +262,48 @@ def display_result(result):
 
     if risk == "High":
         risk_color = Fore.RED
+
     elif risk == "Medium":
         risk_color = Fore.YELLOW
+
     elif risk == "Low":
         risk_color = Fore.GREEN
+
     else:
         risk_color = Fore.CYAN
 
     print("\n" + "=" * 45)
-    print(Fore.CYAN + Style.BRIGHT + "          XSSpectra - ANALYSIS REPORT")
+    print(
+        Fore.CYAN
+        + Style.BRIGHT
+        + "          XSSpectra - ANALYSIS REPORT"
+    )
     print("=" * 45)
 
-    print(f"Reflection       : {'Detected' if result['reflected'] else 'Not Detected'}")
-    print(f"Context          : {', '.join(result['contexts']) if result['contexts'] else 'Unknown'}")
-    print(f"Encoding         : {'Detected' if result['encoding']['encoded'] else 'Not Detected'}")
+    print(
+        f"Reflection       : "
+        f"{'Detected' if result['reflected'] else 'Not Detected'}"
+    )
+
+    print(
+        f"Context          : "
+        f"{', '.join(result['contexts']) if result['contexts'] else 'Unknown'}"
+    )
+
+    print(
+        f"Encoding         : "
+        f"{'Detected' if result['encoding']['encoded'] else 'Not Detected'}"
+    )
 
     print("-" * 45)
-    print(f"Risk Level       : {risk_color}{Style.BRIGHT}{risk}")
+
+    print(
+        f"Risk Level       : "
+        f"{risk_color}{Style.BRIGHT}{risk}"
+    )
+
     print(f"Confidence       : {result['confidence']}")
+
     print("-" * 45)
 
     print("Explanation:")
@@ -221,6 +312,9 @@ def display_result(result):
     print("=" * 45)
 
 
+# --------------------------------------------------
+# 7. TESTING / DEMONSTRATION
+# --------------------------------------------------
 
 if __name__ == "__main__":
 
