@@ -1,4 +1,6 @@
-
-requests>=2.31.0
-beautifulsoup4>=4.12.0
-Flask>=3.0.0
+requests>=2.31,<3
+beautifulsoup4>=4.12,<5
+Flask>=3.0,<4
+colorama>=0.4.6,<1
+pytest>=8,<10
+# Optional for --verify-browser: pip install playwright && python -m playwright install chromium
